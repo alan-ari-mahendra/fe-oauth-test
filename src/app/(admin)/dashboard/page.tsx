@@ -1,10 +1,32 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { signOut } from "next-auth/react"
+import {useEffect, useState} from "react"
+import {useRouter} from "next/navigation"
+import {signOut} from "next-auth/react"
 import api from "@/lib/axios"
-import { useBackendToken } from "@/hooks/useBackendToken"
+import {useBackendToken} from "@/hooks/useBackendToken"
+import type { AxiosError } from "axios"
+import {
+    AppBar,
+    Avatar,
+    Box,
+    Button,
+    Card,
+    CardContent,
+    Chip,
+    CircularProgress,
+    Container,
+    Toolbar,
+    Typography,
+    Alert,
+    Paper,
+} from "@mui/material"
+import {
+    Logout,
+    DeleteForever,
+    Autorenew,
+} from "@mui/icons-material"
+import {LoadingButton} from "@mui/lab"
 
 interface DashboardData {
     message: string
@@ -16,9 +38,9 @@ interface DashboardData {
 }
 
 export default function Dashboard() {
-    const { token, isLoading, isAuthenticated, session } = useBackendToken()
+    const {token, isLoading, isAuthenticated, session} = useBackendToken()
     const router = useRouter()
-
+    const [resetLoading, setResetLoading] = useState(false)
     const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string>("")
@@ -48,151 +70,198 @@ export default function Dashboard() {
             setError("")
 
             const response = await api.get("/api/dashboard", {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {Authorization: `Bearer ${token}`},
             })
 
             setDashboardData(response.data)
-        } catch (err: any) {
-            console.error("Dashboard API error:", err)
-            setError("Failed to fetch dashboard data")
+        } catch (err: unknown) {
+            if ((err as AxiosError)?.isAxiosError) {
+                const axiosErr = err as AxiosError<{ message?: string }>
+                console.error("Dashboard API error:", axiosErr)
+                setError(axiosErr.response?.data?.message || "Failed to fetch dashboard data")
+            } else {
+                console.error("Unexpected error:", err)
+                setError("Unexpected error occurred")
+            }
         } finally {
             setLoading(false)
         }
     }
 
+    const handleResetAllUsers = async () => {
+        const confirmed = confirm(
+            "This will DELETE ALL USERS from the database and sign you out.\n" +
+            "You'll need to sign in again and can choose a different Google account.\n\n" +
+            "Are you sure you want to continue?"
+        )
+
+        if (!confirmed) return
+
+        try {
+            setResetLoading(true)
+            setError("")
+
+            alert(
+                "All users deleted successfully!\n\n" +
+                "You will now be signed out. When you sign in again, " +
+                "you can choose any Google account (including different ones)."
+            )
+
+            await signOut({
+                callbackUrl: "/login",
+                redirect: true,
+            })
+        } catch (err: unknown) {
+            if ((err as AxiosError)?.isAxiosError) {
+                const axiosErr = err as AxiosError<{ message?: string }>
+                console.error("Reset all users error:", axiosErr)
+                setError(axiosErr.response?.data?.message || "Failed to reset users")
+            } else {
+                console.error("Unexpected error:", err)
+                setError("Unexpected error occurred")
+            }
+        } finally {
+            setResetLoading(false)
+        }
+    }
+
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Loading...</p>
-                </div>
-            </div>
+            <Box
+                minHeight="100vh"
+                display="flex"
+                flexDirection="column"
+                alignItems="center"
+                justifyContent="center"
+                bgcolor="grey.50"
+            >
+                <CircularProgress color="primary"/>
+                <Typography variant="body2" color="text.secondary" mt={2}>
+                    Loading...
+                </Typography>
+            </Box>
         )
     }
 
     if (!isAuthenticated) return null
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* Navigation */}
-            <nav className="bg-white shadow-sm border-b">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-16">
-                        <div className="flex items-center">
-                            <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-                        </div>
-                        <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-700">
-                Welcome, {session?.user?.name}
-              </span>
-                            <button
-                                onClick={handleLogout}
-                                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
-                            >
-                                Sign Out
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </nav>
+        <Box minHeight="100vh" bgcolor="grey.50">
+            <AppBar
+                position="static"
+                sx={{backgroundColor: "white", color: "black", boxShadow: 1}}
+            >
+                <Toolbar>
+                    <Typography
+                        variant="h6"
+                        component="div"
+                        sx={{flexGrow: 1, fontWeight: "bold"}}
+                    >
+                        Dashboard
+                    </Typography>
+                    <Typography variant="body2" sx={{mr: 2}}>
+                        Welcome, {session?.user?.name}
+                    </Typography>
+                    <Button
+                        color="primary"
+                        variant="contained"
+                        startIcon={<Logout/>}
+                        onClick={handleLogout}
+                        sx={{textTransform: "none"}}
+                    >
+                        Sign Out
+                    </Button>
+                </Toolbar>
+            </AppBar>
 
-            <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                {/* User Profile Card */}
-                <div className="bg-white rounded-lg shadow-sm border mb-8">
-                    <div className="px-6 py-8 flex items-center">
+            <Container sx={{py: 6}}>
+                <Box mb={3}>
+                    <LoadingButton
+                        onClick={handleResetAllUsers}
+                        loading={resetLoading}
+                        variant="contained"
+                        color="error"
+                        startIcon={<DeleteForever/>}
+                    >
+                        Reset All Users (Dev)
+                    </LoadingButton>
+                </Box>
+
+                <Card sx={{mb: 4}}>
+                    <CardContent sx={{display: "flex", alignItems: "center"}}>
                         {session?.user?.image ? (
-                            <img
-                                className="h-16 w-16 rounded-full border-2 border-gray-200"
+                            <Avatar
                                 src={session.user.image}
                                 alt="Profile"
+                                sx={{width: 64, height: 64}}
                             />
                         ) : (
-                            <div className="h-16 w-16 rounded-full bg-indigo-100 flex items-center justify-center">
-                <span className="text-indigo-600 font-medium text-lg">
-                  {session?.user?.name?.charAt(0).toUpperCase()}
-                </span>
-                            </div>
+                            <Avatar sx={{width: 64, height: 64, bgcolor: "primary.light"}}>
+                                {session?.user?.name?.charAt(0).toUpperCase()}
+                            </Avatar>
                         )}
-                        <div className="ml-6">
-                            <h2 className="text-2xl font-bold text-gray-900">
+
+                        <Box ml={3}>
+                            <Typography variant="h5" fontWeight="bold">
                                 {session?.user?.name}
-                            </h2>
-                            <p className="text-gray-600">{session?.user?.email}</p>
-                            <div className="mt-2">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  <span className="w-2 h-2 bg-green-400 rounded-full mr-1"></span>
-                  Authenticated
-                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                {session?.user?.email}
+                            </Typography>
+                            <Chip
+                                label="Authenticated"
+                                color="success"
+                                size="small"
+                                sx={{mt: 1}}
+                            />
+                        </Box>
+                    </CardContent>
+                </Card>
 
-                {/* Actions */}
-                <div className="bg-white rounded-lg shadow-sm border mb-8 px-6 py-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
-                        Dashboard Actions
-                    </h3>
-                    <div className="flex space-x-4">
-                        <button
-                            onClick={fetchDashboardData}
-                            disabled={loading}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                        >
-                            {loading ? (
-                                <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                    Loading...
-                                </>
-                            ) : (
-                                <>
-                                    <svg
-                                        className="w-4 h-4 mr-2"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                                        />
-                                    </svg>
-                                    Test Backend API
-                                </>
-                            )}
-                        </button>
-                    </div>
+                <Card sx={{mb: 4}}>
+                    <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                            Dashboard Actions
+                        </Typography>
+                        <Box display="flex" gap={2}>
+                            <LoadingButton
+                                onClick={fetchDashboardData}
+                                loading={loading}
+                                variant="contained"
+                                color="success"
+                                startIcon={<Autorenew/>}
+                            >
+                                Test Backend API
+                            </LoadingButton>
+                        </Box>
 
-                    {error && (
-                        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                            <p className="text-sm text-red-800">{error}</p>
-                        </div>
-                    )}
+                        {error && (
+                            <Alert severity="error" sx={{mt: 3}}>
+                                {error}
+                            </Alert>
+                        )}
 
-                    {dashboardData && (
-                        <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                            <p className="text-sm text-green-800 font-medium">API Response:</p>
-                            <pre className="mt-2 text-xs text-green-700 bg-green-100 p-2 rounded overflow-auto">
-                {JSON.stringify(dashboardData, null, 2)}
-              </pre>
-                        </div>
-                    )}
-                </div>
+                        {dashboardData && (
+                            <Alert severity="success" sx={{mt: 3, whiteSpace: "pre-wrap"}}>
+                                <Typography fontWeight="bold">API Response:</Typography>
+                                <pre style={{margin: 0}}>
+                  {JSON.stringify(dashboardData, null, 2)}
+                </pre>
+                            </Alert>
+                        )}
+                    </CardContent>
+                </Card>
 
-                {/* Content */}
-                <div className="bg-white rounded-lg shadow-sm border px-6 py-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">
+                <Paper sx={{p: 3}}>
+                    <Typography variant="h6" gutterBottom>
                         Protected Content
-                    </h3>
-                    <p className="text-gray-600">
+                    </Typography>
+                    <Typography color="text.secondary">
                         This is your protected dashboard content. Only authenticated users
                         can access this page.
-                    </p>
-                </div>
-            </div>
-        </div>
+                    </Typography>
+                </Paper>
+            </Container>
+        </Box>
     )
 }
